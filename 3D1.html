@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paragon 3D Cube</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505; /* Deep dark background */
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc; /* Neon Cyan */
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+        }
+
+        p {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: 5px;
+            color: #ff00ff; /* Neon Magenta accent */
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-layer">
+        <h1>System Core</h1>
+        <p>Target: Rotating Hex-Cube</p>
+    </div>
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- SCENE SETUP (Three.js) ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        // Add some subtle fog for depth
+        scene.fog = new THREE.FogExp2(0x050505, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0x404040, 2); // Soft white light
+        scene.add(ambientLight);
+
+        const pointLight1 = new THREE.PointLight(0x00ffcc, 1, 100); // Cyan
+        pointLight1.position.set(5, 5, 5);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xff00ff, 1, 100); // Magenta
+        pointLight2.position.set(-5, -5, 5);
+        scene.add(pointLight2);
+
+        // --- OBJECTS ---
+        const geometry = new THREE.BoxGeometry(2, 2, 2);
+
+        // Material 1: The solid inner core (dark, reflective)
+        const materialCore = new THREE.MeshPhysicalMaterial({
+            color: 0x111111,
+            metalness: 0.9,
+            roughness: 0.1,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+            reflectivity: 1
+        });
+        const cubeCore = new THREE.Mesh(geometry, materialCore);
+        scene.add(cubeCore);
+
+        // Material 2: The wireframe exoskeleton (glowing edges)
+        const geoWire = new THREE.EdgesGeometry(geometry);
+        const matWire = new THREE.LineBasicMaterial({ color: 0x00ffcc, linewidth: 2 });
+        const wireframe = new THREE.LineSegments(geoWire, matWire);
+        cubeCore.add(wireframe); // Attach to core so they rotate together
+
+        // Floating particles for atmosphere
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 200;
+        const posArray = new Float32Array(particlesCount * 3);
+        
+        for(let i = 0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 15;
+        }
+        
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.05,
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.5
+        });
+        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+        scene.add(particlesMesh);
+
+
+        // --- ANIMATION (Anime.js Integration) ---
+        // Using Anime.js to drive the rotation values for precise control
+        // adhering to ANIME3.md's spirit of feature utilization.
+        
+        const rotationObject = {
+            x: 0,
+            y: 0,
+            z: 0
+        };
+
+        // Animation 1: Continuous smooth complex rotation
+        anime({
+            targets: rotationObject,
+            x: Math.PI * 2, // Full rotation
+            y: Math.PI * 4, // Double speed Y
+            z: Math.PI,     // Half speed Z
+            duration: 10000,
+            easing: 'linear',
+            loop: true,
+            update: function() {
+                cubeCore.rotation.x = rotationObject.x;
+                cubeCore.rotation.y = rotationObject.y;
+                cubeCore.rotation.z = rotationObject.z;
+            }
+        });
+
+        // Animation 2: Pulsing scale effect on the wireframe
+        // Using an object to tween the scale property
+        const scaleObj = { val: 1 };
+        anime({
+            targets: scaleObj,
+            val: 1.05,
+            duration: 1500,
+            direction: 'alternate',
+            loop: true,
+            easing: 'easeInOutSine',
+            update: function() {
+                wireframe.scale.set(scaleObj.val, scaleObj.val, scaleObj.val);
+            }
+        });
+
+        // Animation 3: Subtle floating camera movement
+        anime({
+            targets: camera.position,
+            z: [5, 6],
+            y: [0, 0.5],
+            duration: 4000,
+            direction: 'alternate',
+            loop: true,
+            easing: 'easeInOutQuad'
+        });
+
+        // --- RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Slow rotation for particles
+            particlesMesh.rotation.y += 0.0005;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- RESIZE HANDLER ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
